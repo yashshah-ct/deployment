@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: user-service-config
+  namespace: production
+data:
+  DATABASE_URL: "postgresql://appuser:PLACEHOLDER_DB_PASSWORD@postgres-service.production.svc.cluster.local:5432/users"
+  LOG_LEVEL: "info"
+  PORT: "8000"

@@ -1,0 +1,11 @@
+project_id             = "your-gcp-project-id"
+region                 = "us-central1"
+cluster_name           = "main-cluster"
+vpc_name               = "main-vpc"
+subnet_cidr            = "10.0.0.0/20"
+min_node_count         = 1
+max_node_count         = 5
+machine_type           = "e2-medium"
+artifact_registry_name = "microservices"
+jenkins_sa_email       = "jenkins@your-gcp-project-id.iam.gserviceaccount.com"
+environment            = "production"

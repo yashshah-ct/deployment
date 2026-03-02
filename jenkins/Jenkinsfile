@@ -1,0 +1,78 @@
+pipeline {
+  parameters {
+    string(name: 'SERVICE_NAME', defaultValue: 'user-service', description: 'Service to build and deploy')
+  }
+  agent {
+    kubernetes {
+      yaml """
+apiVersion: v1
+kind: Pod
+spec:
+  serviceAccountName: jenkins-agent
+  containers:
+  - name: docker
+    image: docker:24-dind
+    securityContext:
+      privileged: true
+    env:
+    - name: DOCKER_TLS_CERTDIR
+      value: ""
+  - name: kubectl
+    image: gcr.io/cloud-builders/kubectl
+    command: ["sleep", "infinity"]
+"""
+    }
+  }
+  environment {
+    REGISTRY = "${env.ARTIFACT_REGISTRY_URL}"
+    CLUSTER_NAME = "${env.CLUSTER_NAME}"
+    REGION = "${env.GCP_REGION}"
+  }
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+    stage('Build') {
+      steps {
+        container('docker') {
+          sh """
+            docker build -t ${REGISTRY}/${SERVICE_NAME}:${BUILD_NUMBER} .
+            docker tag ${REGISTRY}/${SERVICE_NAME}:${BUILD_NUMBER} ${REGISTRY}/${SERVICE_NAME}:latest
+          """
+        }
+      }
+    }
+    stage('Push') {
+      steps {
+        container('docker') {
+          withCredentials([usernamePassword(credentialsId: 'artifact-registry-creds', usernameVariable: 'REGISTRY_USER', passwordVariable: 'REGISTRY_PASS')]) {
+            sh """
+              echo \$REGISTRY_PASS | docker login -u \$REGISTRY_USER --password-stdin ${REGISTRY}
+              docker push ${REGISTRY}/${SERVICE_NAME}:${BUILD_NUMBER}
+              docker push ${REGISTRY}/${SERVICE_NAME}:latest
+            """
+          }
+        }
+      }
+    }
+    stage('Deploy') {
+      steps {
+        container('kubectl') {
+          sh """
+            kubectl set image deployment/${SERVICE_NAME} ${SERVICE_NAME}=${REGISTRY}/${SERVICE_NAME}:${BUILD_NUMBER} -n production
+            kubectl rollout status deployment/${SERVICE_NAME} -n production --timeout=300s
+          """
+        }
+      }
+    }
+  }
+  post {
+    failure {
+      container('kubectl') {
+        sh "kubectl rollout undo deployment/${SERVICE_NAME} -n production || true"
+      }
+    }
+  }
+}

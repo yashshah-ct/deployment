@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-config
+  namespace: production
+data:
+  RABBITMQ_DEFAULT_USER: "guest"
